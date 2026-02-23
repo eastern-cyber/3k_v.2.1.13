@@ -3,7 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Count
 from .forms import PostForm
-from .models import Post
+from .models import Post, Comment
 
 
 @login_required
@@ -74,6 +74,19 @@ def post_page_view(request, pk=None):
     
     post = get_object_or_404(Post, uuid=pk)
     
+    if request.method == "POST":
+        body = request.POST.get('comment')
+        if body:
+            Comment.objects.create(
+                author=request.user,
+                post=post,
+                body=body
+            )
+            context = {
+                'post': post
+            }
+            return render(request, 'a_posts/partials/comments/_comment_loop.html', context)
+    
     if post.author:
         author_posts = list(Post.objects.filter(author=post.author).order_by('-created_at'))
         index = author_posts.index(post)
@@ -137,3 +150,19 @@ def bookmark_post(request, pk):
         return render(request, 'a_posts/partials/_bookmark_postpage.html', context)
     
     return redirect('post_page', pk)
+
+@login_required
+def comment(request, pk):
+    if not request.htmx:
+        return redirect('home')
+    
+    comment = get_object_or_404(Comment, uuid=pk)
+    
+    context = {
+        'comment': comment,
+    }
+    
+    if request.GET.get("hide_replies"):
+        return render(request, 'a_posts/partials/comments/_button_view_replies.html', context)
+    
+    return render(request, 'a_posts/partials/comments/_reply_loop.html', context)
