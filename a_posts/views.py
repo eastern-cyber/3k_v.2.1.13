@@ -2,7 +2,8 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Count
-from .forms import PostForm
+from django.http import HttpResponse
+from .forms import PostForm, PostEditForm
 from .models import Post, Comment
 
 
@@ -152,17 +153,63 @@ def bookmark_post(request, pk):
     return redirect('post_page', pk)
 
 @login_required
-def comment(request, pk):
+def comment(request, pk):  # Keep as 'pk' since that's what your URL pattern uses
+    if not request.htmx:
+        return redirect('home')
+    
+    # Get the comment using uuid field (since pk parameter contains the UUID)
+    comment = get_object_or_404(Comment, uuid=pk)
+    
+    parent_comment = comment
+    while parent_comment.parent_comment is not None:
+        parent_comment = parent_comment.parent_comment
+    
+    if request.method == 'POST':
+        body = request.POST.get('reply')
+        if body:
+            Comment.objects.create(
+                author=request.user,
+                post=comment.post,
+                parent_comment=comment,
+                body=body
+            )
+            # After creating reply, return the updated replies list
+            context = {
+                'comment': parent_comment,
+            }
+            return render(request, 'a_posts/partials/comments/_reply_loop.html', context)
+    
+    context = {
+        'comment': parent_comment,
+    }
+    
+    # Handle different GET parameters
+    if request.GET.get("hide_replies"):
+        return render(request, 'a_posts/partials/comments/_button_view_replies.html', context)
+    
+    if request.GET.get("reply_form"):
+        return render(request, 'a_posts/partials/comments/_form_add_reply.html', context)
+    
+    # Default: show the reply loop
+    return render(request, 'a_posts/partials/comments/_reply_loop.html', context)
+
+@login_required
+def comment_delete(request, pk):
     if not request.htmx:
         return redirect('home')
     
     comment = get_object_or_404(Comment, uuid=pk)
     
-    context = {
-        'comment': comment,
-    }
+    # Check if user is authorized to delete
+    if request.user == comment.author or request.user.is_staff:
+        comment.delete()
+        
+        # If it's a reply, return empty (remove from DOM)
+        if comment.parent_comment:
+            return HttpResponse('')  # HTMX will remove the element
+        
+        # If it's a top-level comment, you might want to reload the page
+        # or show a "deleted" message
+        return HttpResponse('<div class="text-gray-500 text-sm">ความคิดเห็นถูกลบแล้ว</div>')
     
-    if request.GET.get("hide_replies"):
-        return render(request, 'a_posts/partials/comments/_button_view_replies.html', context)
-    
-    return render(request, 'a_posts/partials/comments/_reply_loop.html', context)
+    return HttpResponse('Unauthorized', status=401)

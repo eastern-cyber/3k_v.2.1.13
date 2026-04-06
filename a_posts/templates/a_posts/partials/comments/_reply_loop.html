@@ -7,7 +7,7 @@
         hx-swap="innerHTML"
         class="mt-3 flex items-center gap-2 text-gray-600 hover:text-gray-400">
         <span class="text-sm font-medium">
-            ซ่อนคอมเม้นท์ - Hiderepl{{ comment.replies.count|pluralize:"y,ies" }}
+            ซ่อนการตอบ - Hide repl{{ comment.replies.count|pluralize:"y,ies" }}
         </span>
         <div class="size-3.5 rotate-180">
             <svg fill="currentColor" viewBox="0 0 48 48">
@@ -15,3 +15,10 @@
             </svg>
         </div>
 </button>
+
+
+<!-- REmove reply form -->
+<div hx-swap-oob="outerHTML" id="reply_form_{{ comment.uuid }}"></div>
+
+<!-- Update comment count -->
+<div hx-swap-oob="innerHTML" id="comment_count">{{ comment.post.comments.count }}</div>

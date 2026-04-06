@@ -1,0 +1,10 @@
+<form class="pt-6 text-center"
+    hx-post="{% url 'comment_delete' comment.uuid %}"
+    hx-target="#comment_{{ comment.body }}"
+    hx-swap="delete">
+    {% csrf_token %}
+    <div class="pb-4">{{ comment.body }}</div>
+    <button type="submit" class="font-medium text-red-600 hover:underline">
+        ลบคอมเม้นท์
+    </button>
+</form>
