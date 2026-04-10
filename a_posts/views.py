@@ -3,15 +3,24 @@ from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Count
 from django.http import HttpResponse
+from itertools import chain
+from operator import attrgetter
 from .forms import PostForm, PostEditForm
-from .models import Post, Comment
+from .models import Post, Comment, Repost
 
 
 @login_required
 def home_view(request):
     posts = Post.objects.order_by('-created_at')
+    reposts = Repost.objects.select_related('post', 'user')
     
-    paginator = Paginator(posts, 1)
+    feed = sorted(
+        chain(posts, reposts),
+        key = attrgetter('created_at'),
+        reverse = True
+    )
+    
+    paginator = Paginator(feed, 1)
     page_number = int(request.GET.get('page_number', 1))
     posts_page = paginator.get_page(page_number)
     next_page = posts_page.next_page_number() if posts_page.has_next() else None
@@ -163,6 +172,8 @@ def comment(request, pk):  # Keep as 'pk' since that's what your URL pattern use
     parent_comment = comment
     while parent_comment.parent_comment is not None:
         parent_comment = parent_comment.parent_comment
+        
+    parent_reply = comment if comment.parent_comment else None
     
     if request.method == 'POST':
         body = request.POST.get('reply')
@@ -170,7 +181,8 @@ def comment(request, pk):  # Keep as 'pk' since that's what your URL pattern use
             Comment.objects.create(
                 author=request.user,
                 post=comment.post,
-                parent_comment=comment,
+                parent_comment=parent_comment,
+                parent_reply=parent_reply,
                 body=body
             )
             # After creating reply, return the updated replies list
@@ -181,6 +193,7 @@ def comment(request, pk):  # Keep as 'pk' since that's what your URL pattern use
     
     context = {
         'comment': parent_comment,
+        'current_comment': comment,
     }
     
     # Handle different GET parameters
@@ -199,6 +212,20 @@ def comment_delete(request, pk):
         return redirect('home')
     
     comment = get_object_or_404(Comment, uuid=pk)
+    if comment.author != request.user:
+        return HttpResponse()
+    
+    if request.method == 'POST':
+        post = comment.post
+        comment.delete()
+        comment_count = post.comments.count()
+        response = f"<div hx-swap-oob='innerHTML' id='comment_count'>{comment_count}</div>"
+        return HttpResponse(response)
+    
+    context = {
+        'comment': comment
+    }
+    return render(request, 'a_posts/partials/comments/_form_delete_comment.html', context)
     
     # Check if user is authorized to delete
     if request.user == comment.author or request.user.is_staff:
@@ -213,3 +240,20 @@ def comment_delete(request, pk):
         return HttpResponse('<div class="text-gray-500 text-sm">ความคิดเห็นถูกลบแล้ว</div>')
     
     return HttpResponse('Unauthorized', status=401)
+
+@login_required
+def like_comment(request, pk):
+    if not request.htmx:
+        return redirect('home')
+    
+    comment = get_object_or_404(Comment, uuid=pk)
+    
+    if comment.likes.filter(id=request.user.id).exists():
+        comment.likes.remove(request.user)
+    else:
+        comment.likes.add(request.user)
+        
+    context = {
+        'comment': comment
+    }
+    return render(request, 'a_posts/partials/comments/_button_like_comment.html', context)

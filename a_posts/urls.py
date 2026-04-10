@@ -8,4 +8,5 @@ urlpatterns = [
     path('bookmark/<pk>/', bookmark_post, name='bookmark_post'),
     path('comment/<uuid:pk>/', comment, name='comment'),
     path('comment/delete/<uuid:pk>/', comment_delete, name='comment_delete'),  # Add this line
+    path('like_comment/<pk>/', like_comment, name='like_comment'),
 ]
