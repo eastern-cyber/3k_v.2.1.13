@@ -43,6 +43,8 @@ next-env.d.ts
 .venv/
 venv/
 .venv/
+media/
 __pycache__/
+db.sqlite3
 *.pyc
 *.pyo

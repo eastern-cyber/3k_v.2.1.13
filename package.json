@@ -8,7 +8,10 @@
   "scripts": {
     "dev": "vercel dev",
     "start": "node server.js",
-    "deploy": "vercel --prod"
+    "deploy": "vercel --prod",
+    "css": "tailwindcss -i ./static/css/tailwind.css -o ./static/css/style.css --watch",
+    "minify": "tailwindcss -i ./static/css/tailwind.css -o ./static/css/style.css --minify",
+    "freeze": "pip freeze > requirements.txt"
   },
   "dependencies": {
     "bcrypt": "^5.1.0",

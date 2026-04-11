@@ -15,17 +15,29 @@ from pathlib import Path
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+from environ import Env
+env = Env()
+env.read_env()
+
+ENVIRONMENT = env('ENVIRONMENT', default='development')
+
+POSTGRES_LOCALLY = False
+
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-rtg8ud-=38%@7^l#lsvt&)w3-6amt-l0t1q1_6ejbkna145_fu'
+SECRET_KEY = env('SECRET_KEY', default="secret-key")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+if ENVIRONMENT == 'development':
+    DEBUG = True
+else:
+    DEBUG = False
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", detault=["localhost", "127.0.0.1"])
+CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=["http://localhost", "http://127.0.0.1"])
 
 
 # Application definition
@@ -59,6 +71,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'django_htmx.middleware.HtmxMiddleware',
     'allauth.account.middleware.AccountMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
 ]
 if DEBUG:
     MIDDLEWARE += ['django_browser_reload.middleware.BrowserReloadMiddleware']
@@ -85,18 +98,39 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = '_core.wsgi.application'
+ASGI_APPLICATION = '_core.asgi.application'
 
+if ENVIRONMENT == 'production':
+    CHANNEL_LYERS = {
+        'default': {
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {
+                "hosts": [env("REDIS_URL", default="redis://localhost:6379/0")],
+            },
+        },
+    }
+else:
+    CHANNEL_LAYERS = {
+        'default': {
+            "BACKEND": "channels.layers.InMemoryChannelLayer",
+        }
+    }
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+import dj_database_url
+if ENVIRONMENT == 'production' or POSTGRES_LOCALLY:
+    DATABASES = {
+        'default': dj_database_url.parse(env("DATABASE_URL", default="sqlite:///db.sqlite3"))
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 
 # Password validation
@@ -135,9 +169,20 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATICFILES_DIRS = [ BASE_DIR / "static" ]
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / "media"
+
+if ENVIRONMENT == 'production' or POSTGRES_LOCALLY:
+    STORAGES = {
+        "default": {
+            "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
+        },
+        "staticfiles": {
+            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        },
+    }
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -146,7 +191,16 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 AUTH_USER_MODEL = 'a_users.CustomUser'
 
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+if ENVIRONMENT == 'development':
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+else:
+    EMAIL_BACKEND = 'django.core.mail.bckends.smtp.EmailBackend'
+    EMAIL_HOST = 'smtp.gmail.com'
+    EMAIL_HOST_USER = env('EMAIL_ADDRESS', default="email@example.com")
+    EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default="password")
+    EMAIL_PORT = 587
+    EMAIL_USE_TLS = True
+    DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
 LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/' 
