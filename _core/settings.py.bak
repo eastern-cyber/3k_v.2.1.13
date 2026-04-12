@@ -21,7 +21,7 @@ env.read_env()
 
 ENVIRONMENT = env('ENVIRONMENT', default='development')
 
-POSTGRES_LOCALLY = True
+POSTGRES_LOCALLY = False
 
 
 # Quick-start development settings - unsuitable for production
@@ -36,13 +36,15 @@ if ENVIRONMENT == 'development':
 else:
     DEBUG = False
 
-ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", detault=["localhost", "127.0.0.1"])
+ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
 CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=["http://localhost", "http://127.0.0.1"])
 
 
 # Application definition
 
 INSTALLED_APPS = [
+    'daphne',
+    'channels',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -53,6 +55,11 @@ INSTALLED_APPS = [
     # My apps
     'a_posts',
     'a_users',
+    'a_network',
+    'a_search',
+    'a_notifications',
+    'a_messages',
+    'a_channels',
     
     # Third party
     'django_browser_reload',
@@ -100,8 +107,9 @@ TEMPLATES = [
 
 ASGI_APPLICATION = '_core.asgi.application'
 
+
 if ENVIRONMENT == 'production':
-    CHANNEL_LYERS = {
+    CHANNEL_LAYERS = {
         'default': {
             'BACKEND': 'channels_redis.core.RedisChannelLayer',
             'CONFIG': {
@@ -109,20 +117,23 @@ if ENVIRONMENT == 'production':
             },
         },
     }
-else:
+else:   
     CHANNEL_LAYERS = {
         'default': {
             "BACKEND": "channels.layers.InMemoryChannelLayer",
         }
     }
 
+
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 import dj_database_url
+import os
 
+# Force PostgreSQL using DATABASE_URL from environment
 DATABASES = {
-    'default': dj_database_url.parse('postgresql://postgres:ivoKVbIwqRgglbluFVEuOkkehtQjBYhZ@metro.proxy.rlwy.net:18430/railway')
+    'default': dj_database_url.parse(os.environ['DATABASE_URL'])
 }
 
 
@@ -162,7 +173,7 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 STATICFILES_DIRS = [ BASE_DIR / "static" ]
-STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATIC_ROOT = BASE_DIR / 'staticfiles' 
 
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / "media"
@@ -187,7 +198,7 @@ AUTH_USER_MODEL = 'a_users.CustomUser'
 if ENVIRONMENT == 'development':
     EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 else:
-    EMAIL_BACKEND = 'django.core.mail.bckends.smtp.EmailBackend'
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
     EMAIL_HOST = 'smtp.gmail.com'
     EMAIL_HOST_USER = env('EMAIL_ADDRESS', default="email@example.com")
     EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default="password")
