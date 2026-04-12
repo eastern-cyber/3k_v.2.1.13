@@ -1,4 +1,3 @@
-
 FROM python:3.11-slim
 
 WORKDIR /app
@@ -15,5 +14,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-CMD python manage.py migrate --noinput && \
-    gunicorn _core.wsgi:application --bind 0.0.0.0:$PORT --workers 1 --timeout 120
+# Run migrations and start gunicorn
+CMD sh -c "python manage.py migrate --noinput && exec gunicorn _core.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 2 --timeout 120 --access-logfile -"
