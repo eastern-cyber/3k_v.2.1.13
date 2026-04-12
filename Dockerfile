@@ -14,5 +14,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# Run migrations and start gunicorn
-CMD sh -c "python manage.py migrate --noinput && exec gunicorn _core.wsgi:application --bind 0.0.0.0:${PORT:-8000} --workers 2 --timeout 120 --access-logfile -"
+# Make start script executable
+RUN chmod +x start.sh
+
+# Run the start script
+CMD ./start.sh
