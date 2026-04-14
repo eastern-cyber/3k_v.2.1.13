@@ -24,8 +24,7 @@ RUN npm ci
 COPY . .
 
 # Build minify CSS and collectstatic
-# RUN npm run minify && python manage.py collectstatic --noinput
-
+RUN npm run minify && python manage.py collectstatic --noinput --verbosity 3 || (echo "=== COLLECTSTATIC FAILED ===" && exit 1)
 EXPOSE 8000
 
 # Daphne (ASGI)
