@@ -24,7 +24,7 @@ RUN npm ci
 COPY . .
 
 # Build minify CSS and collectstatic
-RUN npm run minify && python manage.py collectstatic --noinput
+# RUN npm run minify && python manage.py collectstatic --noinput
 
 EXPOSE 8000
 
