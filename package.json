@@ -14,13 +14,10 @@
     "freeze": "pip freeze > requirements.txt"
   },
   "dependencies": {
-    "bcrypt": "^5.1.0",
-    "pg": "^8.11.0",
-    "jsonwebtoken": "^9.0.0",
     "@tailwindcss/cli": "^4.1.3",
+    "bcrypt": "^6.0.0",
+    "jsonwebtoken": "^9.0.0",
+    "pg": "^8.11.0",
     "tailwindcss": "^4.1.3"
-  },
-  "devDependencies": {
-    "vercel": "^28.0.0"
   }
 }
