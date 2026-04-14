@@ -9,35 +9,42 @@ https://docs.djangoproject.com/en/5.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
-from environ import Env
-env = Env()
-env.read_env()
-import os
-
-from pathlib import Path
-import dj_database_url
 
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+from environ import Env
+env = Env()
+env.read_env()
+
+ENVIRONMENT = env('ENVIRONMENT', default='development')
+
+POSTGRES_LOCALLY = False
+
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-7fb(te5+oz6nu%guy*e!)(#7o&sf+*j^r4=-9vgw$d7h)5m9)*'
+SECRET_KEY = env('SECRET_KEY', default="secret-key")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+if ENVIRONMENT == 'development':
+    DEBUG = True
+else:
+    DEBUG = False
 
-# ALLOWED_HOSTS = []
+ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=["localhost", "127.0.0.1"])
+CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=["http://localhost", "http://127.0.0.1"])
 
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1', '.railway.app'])
+
 # Application definition
 
 INSTALLED_APPS = [
+    'daphne',
+    'channels',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -54,7 +61,6 @@ INSTALLED_APPS = [
     'django_htmx',
     'allauth',
     'allauth.account',
-    'allauth.socialaccount',
 ]
 
 MIDDLEWARE = [
@@ -66,13 +72,12 @@ MIDDLEWARE = [
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'django_htmx.middleware.HtmxMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',
     'allauth.account.middleware.AccountMiddleware',
-
+    'whitenoise.middleware.WhiteNoiseMiddleware',
 ]
 if DEBUG:
     MIDDLEWARE += ['django_browser_reload.middleware.BrowserReloadMiddleware']
-    
+
 AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',
     'allauth.account.auth_backends.AuthenticationBackend',
@@ -83,7 +88,6 @@ ROOT_URLCONF = '_core.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [os.path.join(BASE_DIR, 'templates')],  # This line is important
         'DIRS': [ BASE_DIR / 'templates' ],
         'APP_DIRS': True,
         'OPTIONS': {
@@ -96,17 +100,43 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = '_core.wsgi.application'
+ASGI_APPLICATION = '_core.asgi.application'
+
+
+if ENVIRONMENT == 'production':
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {
+                "hosts": [env("REDIS_URL", default="redis://localhost:6379/0")],
+            },
+        },
+    }
+else:   
+    CHANNEL_LAYERS = {
+        'default': {
+            "BACKEND": "channels.layers.InMemoryChannelLayer",
+        }
+    }
 
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 import dj_database_url
+if ENVIRONMENT == 'production' or POSTGRES_LOCALLY: 
+    DATABASES = {
+        'default': dj_database_url.parse(env("DATABASE_URL", default="sqlite:///db.sqlite3"))
+    }
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
-DATABASES = {
-    'default': dj_database_url.parse(env('DATABASE_URL'))
-}
+
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
 
@@ -141,16 +171,22 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-# STATIC_URL = 'static/'
-STATICFILES_DIRS = [ BASE_DIR / "static"]
-
-# Static files configuration
-STATIC_URL = '/static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+STATIC_URL = 'static/'
+STATICFILES_DIRS = [ BASE_DIR / "static" ]
+STATIC_ROOT = BASE_DIR / 'staticfiles' 
 
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / "media"
+
+if ENVIRONMENT == 'production' or POSTGRES_LOCALLY:
+    STORAGES = {
+        "default": {
+            "BACKEND": "storages.backends.s3boto3.S3Boto3Storage",
+        },
+        "staticfiles": {
+            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
+        },
+    }
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -159,53 +195,18 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 AUTH_USER_MODEL = 'a_users.CustomUser'
 
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+if ENVIRONMENT == 'development':
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+else:
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+    EMAIL_HOST = 'smtp.gmail.com'
+    EMAIL_HOST_USER = env('EMAIL_ADDRESS', default="email@example.com")
+    EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD', default="password")
+    EMAIL_PORT = 587
+    EMAIL_USE_TLS = True
+    DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
 LOGIN_URL = '/login/'
-LOGIN_REDIRECT_URL = '/'
+LOGIN_REDIRECT_URL = '/' 
 ACCOUNT_LOGIN_METHODS = {'username', 'email'}
 ACCOUNT_FORMS = {'signup': 'a_users.forms.CustomSignupForm'}
-
-# Security settings for production
-if os.environ.get('RAILWAY') or os.environ.get('RENDER'):
-    DEBUG = False
-    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-    SECURE_SSL_REDIRECT = True
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
-
-# Static files
-STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
-
-# Security
-if "RAILWAY" in os.environ:
-    DEBUG = False
-    ALLOWED_HOSTS = ["*"]
-    # Add whitenoise middleware
-    if "whitenoise.middleware.WhiteNoiseMiddleware" not in MIDDLEWARE:
-        MIDDLEWARE.insert(1, "whitenoise.middleware.WhiteNoiseMiddleware")
-
-# Safety check for missing packages
-import sys
-
-# List of optional packages that might not be installed
-OPTIONAL_APPS = [
-    'django_browser_reload',
-    'django_htmx',
-]
-
-# Remove any optional apps that aren't installed
-for app in OPTIONAL_APPS:
-    if app in INSTALLED_APPS:
-        try:
-            __import__(app)
-        except ImportError:
-            INSTALLED_APPS.remove(app)
-            print(f"Removed {app} from INSTALLED_APPS (package not installed)", file=sys.stderr)
-
-# Production settings import
-try:
-    from prod_settings import *
-except ImportError:
-    pass
